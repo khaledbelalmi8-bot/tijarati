@@ -1,6 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
+import "./globals.css";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export const dynamic = "force-dynamic";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const metadata = {
+  title: "تجارتي",
+  description: "منصة إدارة تجارة الجملة",
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body>{children}</body>
+    </html>
+  );
+}
