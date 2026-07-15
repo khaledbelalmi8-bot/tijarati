@@ -87,6 +87,8 @@ function CatalogTab({ userId }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("الكل");
 
   useEffect(() => {
     if (userId) load();
@@ -113,6 +115,13 @@ function CatalogTab({ userId }) {
   function setQty(productId, qty) {
     setCart({ ...cart, [productId]: qty });
   }
+
+  const categories = ["الكل", ...Array.from(new Set(products.map((p) => p.category || "عام")))];
+  const filtered = products.filter((p) => {
+    const matchCategory = activeCategory === "الكل" || (p.category || "عام") === activeCategory;
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
   const cartItems = Object.entries(cart).filter(([, qty]) => qty > 0);
   const total = cartItems.reduce((sum, [pid, qty]) => {
@@ -162,26 +171,60 @@ function CatalogTab({ userId }) {
       {msg && (
         <div className="bg-brand-50 text-brand-700 text-sm rounded-lg p-3 text-center">{msg}</div>
       )}
-      {products.length === 0 && <p className="text-gray-400 text-sm">لا يوجد منتجات متاحة حالياً</p>}
-      {products.map((p) => (
-        <div key={p.id} className="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-medium text-sm truncate">{p.name}</p>
-            <p className="text-xs text-gray-500">
-              {priceFor(p)} / {p.unit} · متوفر: {p.stock_quantity}
-            </p>
+
+      <input
+        type="text"
+        placeholder="ابحث عن منتج..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white"
+      />
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap ${
+              activeCategory === cat ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && <p className="text-gray-400 text-sm">لا يوجد منتجات مطابقة</p>}
+
+      <div className="grid grid-cols-2 gap-3">
+        {filtered.map((p) => (
+          <div key={p.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {p.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.image_url} alt={p.name} className="w-full h-28 object-cover" />
+            ) : (
+              <div className="w-full h-28 bg-gray-100 flex items-center justify-center text-gray-300 text-xs">
+                لا توجد صورة
+              </div>
+            )}
+            <div className="p-2.5">
+              <p className="font-medium text-sm truncate">{p.name}</p>
+              <p className="text-xs text-gray-500 mb-2">
+                {priceFor(p)} / {p.unit} · متوفر: {p.stock_quantity}
+              </p>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                value={cart[p.id] || ""}
+                onChange={(e) => setQty(p.id, parseFloat(e.target.value) || 0)}
+                className="w-full border rounded-lg px-2 py-1.5 text-sm text-center"
+              />
+            </div>
           </div>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0"
-            value={cart[p.id] || ""}
-            onChange={(e) => setQty(p.id, parseFloat(e.target.value) || 0)}
-            className="w-20 border rounded-lg px-2 py-1.5 text-sm text-center"
-          />
-        </div>
-      ))}
+        ))}
+      </div>
 
       {cartItems.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.08)] p-4">
