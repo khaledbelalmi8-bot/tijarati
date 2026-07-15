@@ -86,8 +86,12 @@ export default function AdminPage() {
 
 function ProductsTab() {
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", unit: "قطعة", base_price: "", stock_quantity: "" });
+  const [form, setForm] = useState({ name: "", description: "", unit: "قطعة", base_price: "", stock_quantity: "", category: "عام" });
+  const [imageFile, setImageFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [existingImage, setExistingImage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
@@ -101,22 +105,49 @@ function ProductsTab() {
     setLoading(false);
   }
 
+  function onPickImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setPreview(URL.createObjectURL(file));
+  }
+
   async function save(e) {
     e.preventDefault();
+    setSaving(true);
+    let image_url = existingImage;
+
+    if (imageFile) {
+      const path = `${Date.now()}-${imageFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("products")
+        .upload(path, imageFile);
+      if (!uploadError) {
+        const { data } = supabase.storage.from("products").getPublicUrl(path);
+        image_url = data.publicUrl;
+      }
+    }
+
     const payload = {
       name: form.name,
       description: form.description,
       unit: form.unit,
       base_price: parseFloat(form.base_price) || 0,
       stock_quantity: parseFloat(form.stock_quantity) || 0,
+      category: form.category || "عام",
+      image_url,
     };
     if (editingId) {
       await supabase.from("products").update(payload).eq("id", editingId);
     } else {
       await supabase.from("products").insert(payload);
     }
-    setForm({ name: "", description: "", unit: "قطعة", base_price: "", stock_quantity: "" });
+    setForm({ name: "", description: "", unit: "قطعة", base_price: "", stock_quantity: "", category: "عام" });
+    setImageFile(null);
+    setPreview(null);
+    setExistingImage(null);
     setEditingId(null);
+    setSaving(false);
     load();
   }
 
@@ -127,7 +158,11 @@ function ProductsTab() {
       unit: p.unit,
       base_price: p.base_price,
       stock_quantity: p.stock_quantity,
+      category: p.category || "عام",
     });
+    setExistingImage(p.image_url || null);
+    setPreview(p.image_url || null);
+    setImageFile(null);
     setEditingId(p.id);
   }
 
@@ -160,6 +195,12 @@ function ProductsTab() {
         />
         <input
           className="border rounded-lg px-3 py-2 text-sm"
+          placeholder="التصنيف (مثلاً: أدوات، عام)"
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value })}
+        />
+        <input
+          className="border rounded-lg px-3 py-2 text-sm"
           placeholder="الوحدة (قطعة، كرتون...)"
           value={form.unit}
           onChange={(e) => setForm({ ...form, unit: e.target.value })}
@@ -182,8 +223,15 @@ function ProductsTab() {
           onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
           required
         />
-        <button className="bg-brand-600 text-white rounded-lg py-2 text-sm font-medium">
-          {editingId ? "حفظ التعديل" : "إضافة منتج"}
+        <div className="col-span-2 flex items-center gap-3">
+          {preview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="" className="w-16 h-16 rounded-lg object-cover border" />
+          )}
+          <input type="file" accept="image/*" onChange={onPickImage} className="text-xs flex-1" />
+        </div>
+        <button disabled={saving} className="col-span-2 bg-brand-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60">
+          {saving ? "جاري الحفظ..." : editingId ? "حفظ التعديل" : "إضافة منتج"}
         </button>
       </form>
 
@@ -196,12 +244,20 @@ function ProductsTab() {
           )}
           {products.map((p) => (
             <div key={p.id} className="p-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{p.name}</p>
-                <p className="text-xs text-gray-500">
-                  {p.base_price} / {p.unit} · مخزون: {p.stock_quantity}
-                  {!p.active && <span className="text-red-500"> · موقف</span>}
-                </p>
+              <div className="flex items-center gap-2 min-w-0">
+                {p.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover border shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{p.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {p.base_price} / {p.unit} · مخزون: {p.stock_quantity} · {p.category || "عام"}
+                    {!p.active && <span className="text-red-500"> · موقف</span>}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => edit(p)} className="text-xs text-brand-600">
